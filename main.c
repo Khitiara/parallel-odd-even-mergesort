@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
     if (argc != 2) {
-        printf("Usage: %s <output file>\n", argv[0]);
+        printf("Usage: %s <input file>\n", argv[0]);
         exit(1);
     }
 
