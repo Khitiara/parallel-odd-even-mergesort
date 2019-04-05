@@ -44,22 +44,30 @@ int main(int argc, char **argv) {
 
     start_cycles = GetTimeBase();
     load(argv[1]);
+    MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
     time = (end_cycles - start_cycles) / g_processor_frequency;
-    printf("Loaded input data in %lf seconds.\n", time);
-
+    if (mpi_rank == 0) {
+        printf("Loaded input data in %lf seconds.\n", time);
+    }
 
     start_cycles = GetTimeBase();
+    qsort(array, arraylen, sizeof(long long), comp);
     while(merges()) {
         ++iterations;
     }
     ++iterations; // Last iteration
+    MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
     time = (end_cycles - start_cycles) / g_processor_frequency;
-    printf("Sorted %lu elements in %lf seconds with %d iterations.\n", DATA_LENGTH, time, iterations);
+    if (mpi_rank == 0) {
+        printf("Sorted %lu elements in %lf seconds with %d iterations.\n", DATA_LENGTH, time, iterations);
+    }
 
     actually_sorted = check_sorted();
-    printf("Sort check: %s\n", actually_sorted ? "passed" : "failed");
+    if (mpi_rank == 0) {
+        printf("Sort check: %s\n", actually_sorted ? "passed" : "failed");
+    }
 
     free(array);
     free(scratch);
@@ -124,7 +132,6 @@ int comp(const void *elem1, const void *elem2) {
 int merges(void) {
     int parity = mpi_rank % 2, changed = 0, anychanges;
     MPI_Request reqs[2];
-    qsort(array, arraylen, sizeof(long long), comp);
 
     // Even merge
     memcpy(scratch, array, arraylen * sizeof(long long));
