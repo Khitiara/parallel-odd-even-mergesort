@@ -46,7 +46,7 @@ int merge_lower(void) {
  * Merges two arrays stored in the lower and upper halves of scratch
  * and stores the upper half into array.
  */
-int merge_lower(void) {
+int merge_upper(void) {
     long long* dst = array;
     long long* a = scratch;
     long long* b = scratch + arraylen;
