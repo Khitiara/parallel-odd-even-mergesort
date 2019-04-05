@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "timing.h"
+#include <string.h>
 
 #define DATA_LENGTH (1ul << 27u)
 
@@ -13,6 +14,8 @@ int mpi_rank, mpi_size;
 int merge_lower(void);
 
 int merge_upper(void);
+
+int merges(void);
 
 void load(char *fpath);
 
@@ -73,6 +76,58 @@ int merge_upper(void) {
     }
     return order_changed;
 }
+
+
+int comp(const void *elem1, const void *elem2) {
+    long long f = *((long long *) elem1);
+    long long s = *((long long *) elem2);
+    if (f > s) return 1;
+    if (f < s) return -1;
+    return 0;
+}
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "hicpp-signed-bitwise"
+
+int merges(void) {
+    int parity = mpi_rank % 2, changed = 0, anychanges;
+    MPI_Request reqs[2];
+    qsort(array, arraylen, sizeof(long long), comp);
+
+    // Odd merge
+    memcpy(scratch, array, arraylen * sizeof(long long));
+    if (0 == parity) {
+        MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
+        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 1, MPI_COMM_WORLD, reqs + 1);
+        MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+        changed |= merge_lower();
+    } else {
+        MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
+        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 1, MPI_COMM_WORLD, reqs + 1);
+        MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+        changed |= merge_upper();
+    }
+
+    // Even merge
+    if (0 != mpi_rank && mpi_size - 1 != mpi_rank) {
+        if (1 == parity) {
+            MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
+            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 1, MPI_COMM_WORLD, reqs + 1);
+            MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+            changed |= merge_lower();
+        } else {
+            MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
+            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 1, MPI_COMM_WORLD, reqs + 1);
+            MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+            changed |= merge_upper();
+        }
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(&changed, &anychanges, 1, MPI_LONG_LONG_INT, MPI_LOR, MPI_COMM_WORLD);
+    return anychanges;
+}
+
+#pragma clang diagnostic pop
 
 void load(char *fpath) {
     MPI_File fh;
