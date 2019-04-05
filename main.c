@@ -20,6 +20,10 @@ int merges(void);
 void load(char *fpath);
 
 int main(int argc, char **argv) {
+    unsigned long long start_cycles = 0;
+    unsigned long long end_cycles = 0;
+    double time;
+    int iterations = 0;
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -32,7 +36,29 @@ int main(int argc, char **argv) {
 
     arraylen = DATA_LENGTH / mpi_size;
 
+    array = calloc(arraylen, sizeof(long long));
+    scratch = calloc(arraylen * 2, sizeof(long long));
+
+    start_cycles = GetTimeBase();
     load(argv[1]);
+    end_cycles = GetTimeBase();
+    time = (end_cycles - start_cycles) / g_processor_frequency;
+    printf("Loaded input data in %lf seconds.\n", time);
+
+
+    start_cycles = GetTimeBase();
+    while(merges()) {
+        ++iterations;
+    }
+    ++iterations; // Last iteration
+    end_cycles = GetTimeBase();
+    time = (end_cycles - start_cycles) / g_processor_frequency;
+    printf("Sorted %lu elements in %lf seconds with %d iterations.\n", DATA_LENGTH, time, iterations);
+
+    free(array);
+    free(scratch);
+
+    MPI_Finalize();
 
     return 0;
 }
@@ -108,7 +134,7 @@ int merges(void) {
         changed |= merge_upper();
     }
 
-    // Even merge
+    // Even merge - first and last ranks do nothing
     if (0 != mpi_rank && mpi_size - 1 != mpi_rank) {
         if (1 == parity) {
             MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
@@ -132,7 +158,7 @@ int merges(void) {
 void load(char *fpath) {
     MPI_File fh;
     MPI_File_open(MPI_COMM_WORLD, fpath, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
-    MPI_File_read_at_all(fh, mpi_rank * arraylen * sizeof(long long int), array, arraylen, MPI_LONG_LONG_INT,
+    MPI_File_read_at_all(fh, mpi_rank * arraylen * sizeof(long long), array, arraylen, MPI_LONG_LONG_INT,
                          MPI_STATUS_IGNORE);
     MPI_File_close(&fh);
 }
