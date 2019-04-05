@@ -8,7 +8,8 @@ long long *array;    // length arraylen
 long long *scratch;  // length 2 * arraylen
 int mpi_rank, mpi_size;
 
-void merge(void);
+int merge_lower(void);
+int merge_upper(void);
 
 void load(char *fpath);
 
@@ -23,10 +24,42 @@ int main(int argc, char **argv) {
 
 /**
  * Merges two arrays stored in the lower and upper halves of scratch
- * into array.
+ * and stores the lower half into array.
  */
-void merge(void) {
-    return;
+int merge_lower(void) {
+    long long* dst = array;
+    long long* a = scratch;
+    long long* b = scratch + arraylen;
+    int i, order_changed = 0;
+    for(i = 0; i < arraylen; ++i) {
+        if(*a < *b) {
+            *dst++ = *a++;
+        } else {
+            *dst++ = *b++;
+            order_changed = 1;
+        }
+    }
+    return order_changed;
+}
+
+/**
+ * Merges two arrays stored in the lower and upper halves of scratch
+ * and stores the upper half into array.
+ */
+int merge_lower(void) {
+    long long* dst = array;
+    long long* a = scratch;
+    long long* b = scratch + arraylen;
+    int i, order_changed = 0;
+    for(i = 0; i < arraylen; ++i) {
+        if(*a >= *b) {
+            *dst++ = *a++;
+        } else {
+            *dst++ = *b++;
+            order_changed = 1;
+        }
+    }
+    return order_changed;
 }
 
 void load(char *fpath) {
