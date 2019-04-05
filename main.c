@@ -17,6 +17,8 @@ int merge_upper(void);
 
 int merges(void);
 
+int check_sorted(void);
+
 void load(char *fpath);
 
 int main(int argc, char **argv) {
@@ -24,6 +26,7 @@ int main(int argc, char **argv) {
     unsigned long long end_cycles = 0;
     double time;
     int iterations = 0;
+    int actually_sorted;
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
@@ -54,6 +57,9 @@ int main(int argc, char **argv) {
     end_cycles = GetTimeBase();
     time = (end_cycles - start_cycles) / g_processor_frequency;
     printf("Sorted %lu elements in %lf seconds with %d iterations.\n", DATA_LENGTH, time, iterations);
+
+    actually_sorted = check_sorted();
+    printf("Sort check: %s\n", actually_sorted ? "passed" : "failed");
 
     free(array);
     free(scratch);
@@ -161,4 +167,38 @@ void load(char *fpath) {
     MPI_File_read_at_all(fh, mpi_rank * arraylen * sizeof(long long), array, arraylen, MPI_LONG_LONG_INT,
                          MPI_STATUS_IGNORE);
     MPI_File_close(&fh);
+}
+
+/**
+ * Checks that the final array is actually sorted.
+ */
+int check_sorted(void) {
+    MPI_Request req[2];
+    long long max_from_prev_rank;
+    int sorted = 1, finalsorted = 1;
+    size_t i;
+    // receive the maximum element from the previous rank
+    if (mpi_rank != 0) {
+        MPI_Irecv(&max_from_prev_rank, 1, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, &req[0]);
+    }
+    // check our own rank
+    for (i = 1; i < arraylen; ++i) {
+        if (array[i] < array[i - 1]) {
+            sorted = 0;
+            break;
+        }
+    }
+    // send out the maximum element
+    if (mpi_rank != mpi_size - 1) {
+        MPI_Isend(&array[i - 1], 1, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, &req[1]);
+    }
+    if (mpi_rank != 0) {
+        // compare max from the prev rank
+        MPI_Wait(&req[0], MPI_STATUS_IGNORE);
+        if (array[0] < max_from_prev_rank) {
+            sorted = 0;
+        }
+    }
+    MPI_Reduce(&sorted, &finalsorted, 1, MPI_INT, MPI_LAND, 0, MPI_COMM_WORLD);
+    return finalsorted;
 }
