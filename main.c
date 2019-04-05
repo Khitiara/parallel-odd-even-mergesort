@@ -65,6 +65,7 @@ int merge_lower(void) {
 void load(char *fpath) {
     MPI_File fh;
     MPI_File_open(MPI_COMM_WORLD, fpath, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
-    MPI_File_read_at_all(fh, mpi_rank * arraylen, array, arraylen, MPI_LONG_LONG_INT, MPI_STATUS_IGNORE);
+    MPI_File_read_at_all(fh, mpi_rank * arraylen * sizeof(long long int), array, arraylen, MPI_LONG_LONG_INT,
+                         MPI_STATUS_IGNORE);
     MPI_File_close(&fh);
 }
