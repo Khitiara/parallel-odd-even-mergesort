@@ -1,14 +1,17 @@
 #include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "timing.h"
 
-#define DATA_LENGTH 1 << 27
+#define DATA_LENGTH (1ul << 27u)
 
-int arraylen;
+size_t arraylen;
 long long *array;    // length arraylen
 long long *scratch;  // length 2 * arraylen
 int mpi_rank, mpi_size;
 
 int merge_lower(void);
+
 int merge_upper(void);
 
 void load(char *fpath);
@@ -19,6 +22,15 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 
+    if (argc != 2) {
+        printf("Usage: %s <output file>\n", argv[0]);
+        exit(1);
+    }
+
+    arraylen = DATA_LENGTH / mpi_size;
+
+    load(argv[1]);
+
     return 0;
 }
 
@@ -27,12 +39,12 @@ int main(int argc, char **argv) {
  * and stores the lower half into array.
  */
 int merge_lower(void) {
-    long long* dst = array;
-    long long* a = scratch;
-    long long* b = scratch + arraylen;
+    long long *dst = array;
+    long long *a = scratch;
+    long long *b = scratch + arraylen;
     int i, order_changed = 0;
-    for(i = 0; i < arraylen; ++i) {
-        if(*a < *b) {
+    for (i = 0; i < arraylen; ++i) {
+        if (*a < *b) {
             *dst++ = *a++;
         } else {
             *dst++ = *b++;
@@ -47,12 +59,12 @@ int merge_lower(void) {
  * and stores the upper half into array.
  */
 int merge_upper(void) {
-    long long* dst = array;
-    long long* a = scratch;
-    long long* b = scratch + arraylen;
+    long long *dst = array;
+    long long *a = scratch;
+    long long *b = scratch + arraylen;
     int i, order_changed = 0;
-    for(i = 0; i < arraylen; ++i) {
-        if(*a >= *b) {
+    for (i = 0; i < arraylen; ++i) {
+        if (*a >= *b) {
             *dst++ = *a++;
         } else {
             *dst++ = *b++;
