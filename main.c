@@ -120,7 +120,7 @@ int merges(void) {
     MPI_Request reqs[2];
     qsort(array, arraylen, sizeof(long long), comp);
 
-    // Odd merge
+    // Even merge
     memcpy(scratch, array, arraylen * sizeof(long long));
     if (0 == parity) {
         MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
@@ -134,7 +134,7 @@ int merges(void) {
         changed |= merge_upper();
     }
 
-    // Even merge - first and last ranks do nothing
+    // Odd merge - first and last ranks do nothing
     if (0 != mpi_rank && mpi_size - 1 != mpi_rank) {
         if (1 == parity) {
             MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
