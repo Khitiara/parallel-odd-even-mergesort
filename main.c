@@ -11,6 +11,8 @@ long long *array;    // length arraylen
 long long *scratch;  // length 2 * arraylen
 int mpi_rank, mpi_size;
 
+int comp(const void *elem1, const void *elem2);
+
 int merge_lower(void);
 
 int merge_upper(void);
@@ -42,6 +44,7 @@ int main(int argc, char **argv) {
     array = calloc(arraylen, sizeof(long long));
     scratch = calloc(arraylen * 2, sizeof(long long));
 
+    MPI_Barrier(MPI_COMM_WORLD);
     start_cycles = GetTimeBase();
     load(argv[1]);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -51,6 +54,7 @@ int main(int argc, char **argv) {
         printf("Loaded input data in %lf seconds.\n", time);
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     start_cycles = GetTimeBase();
     qsort(array, arraylen, sizeof(long long), comp);
     while(merges()) {
