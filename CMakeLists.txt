@@ -6,10 +6,7 @@ project(parallel-sort)
 
 option(BGQ "Running on BGQ?" OFF)
 
-if(BGQ)
-    add_definitions(-DBGQ=1)
-else(BGQ)
-    add_definitions(-DBGQ=0)
-endif(BGQ)
+configure_file(timing.h.in timing.h)
 
+include_directories(${CMAKE_BINARY_DIR})
 add_executable(sort main.c)

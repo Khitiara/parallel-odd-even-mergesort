@@ -1,0 +1,15 @@
+#ifndef TIMING_H
+#define TIMING_H
+
+#cmakedefine01 BGQ
+
+double g_processor_frequency = 1600000000.0; // processing speed for BG/Q
+
+#if BGQ == 1
+#include <hwi/include/bqc/A2_inlines.h>
+#else
+#include <mpi.h>
+#define GetTimeBase(notused) (g_processor_frequency * MPI_Wtime(notused))
+#endif
+
+#endif // TIMING_H
