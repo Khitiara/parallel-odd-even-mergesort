@@ -65,7 +65,19 @@ int main(int argc, char **argv) {
     end_cycles = GetTimeBase();
     time = (end_cycles - start_cycles) / g_processor_frequency;
     if (g_mpi_rank == 0) {
-        printf("Sorted %lu elements in %lf seconds with %d iterations.\n", DATA_LENGTH, time, iterations);
+        printf("Computation statistics:\n"
+               "        Rank Count: %d\n"
+               "    Total Elements: %lu\n"
+               "     Elements/Rank: %lu\n"
+               "        Iterations: %d\n"
+               "      Run time (s): %lf\n"
+               "Time/Iteration (s): %lf\n",
+            mpi_size,
+            DATA_LENGTH,
+            arraylen,
+            iterations,
+            time,
+            time / iterations);
     }
 
     actually_sorted = check_sorted();
