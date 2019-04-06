@@ -6,10 +6,10 @@
 
 #define DATA_LENGTH (1ul << 27u)
 
-size_t arraylen;
+size_t g_arraylen;
 long long *array;    // length arraylen
 long long *scratch;  // length 2 * arraylen
-int mpi_rank, mpi_size;
+int g_mpi_rank, mpi_size;
 
 int comp(const void *elem1, const void *elem2);
 
@@ -32,14 +32,14 @@ int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
 
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &g_mpi_rank);
 
     if (argc != 2) {
         printf("Usage: %s <input file>\n", argv[0]);
         exit(1);
     }
 
-    arraylen = DATA_LENGTH / mpi_size;
+    const size_t arraylen = g_arraylen = DATA_LENGTH / mpi_size;
 
     array = calloc(arraylen, sizeof(long long));
     scratch = calloc(arraylen * 2, sizeof(long long));
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
     time = (end_cycles - start_cycles) / g_processor_frequency;
-    if (mpi_rank == 0) {
+    if (g_mpi_rank == 0) {
         printf("Loaded input data in %lf seconds.\n", time);
     }
 
@@ -64,12 +64,12 @@ int main(int argc, char **argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
     time = (end_cycles - start_cycles) / g_processor_frequency;
-    if (mpi_rank == 0) {
+    if (g_mpi_rank == 0) {
         printf("Sorted %lu elements in %lf seconds with %d iterations.\n", DATA_LENGTH, time, iterations);
     }
 
     actually_sorted = check_sorted();
-    if (mpi_rank == 0) {
+    if (g_mpi_rank == 0) {
         printf("Sort check: %s\n", actually_sorted ? "passed" : "failed");
     }
 
@@ -86,9 +86,10 @@ int main(int argc, char **argv) {
  * and stores the lower half into array.
  */
 int merge_lower(void) {
-    long long *dst = array;
-    long long *a = scratch;
-    long long *b = scratch + arraylen;
+    const size_t arraylen = g_arraylen;
+    long long *restrict dst = array;
+    const long long *a = scratch;
+    const long long *b = scratch + arraylen;
     int i, order_changed = 0;
     for (i = 0; i < arraylen; ++i) {
         if (*a < *b) {
@@ -106,9 +107,10 @@ int merge_lower(void) {
  * and stores the upper half into array.
  */
 int merge_upper(void) {
-    long long *dst = array + arraylen;
-    long long *a = scratch + arraylen;
-    long long *b = scratch + arraylen + arraylen;
+    const size_t arraylen = g_arraylen;
+    long long *restrict dst = array + arraylen;
+    const long long *a = scratch + arraylen;
+    const long long *b = scratch + arraylen + arraylen;
     int i, order_changed = 0;
     for (i = 0; i < arraylen; ++i) {
         if (a[-1] >= b[-1]) {
@@ -134,6 +136,8 @@ int comp(const void *elem1, const void *elem2) {
 #pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
 int merges(void) {
+    const size_t arraylen = g_arraylen;
+    const int mpi_rank = g_mpi_rank;
     int parity = mpi_rank % 2, changed = 0, anychanges;
     MPI_Request reqs[2];
 
@@ -173,6 +177,8 @@ int merges(void) {
 #pragma clang diagnostic pop
 
 void load(char *fpath) {
+    const size_t arraylen = g_arraylen;
+    const int mpi_rank = g_mpi_rank;
     MPI_File fh;
     MPI_File_open(MPI_COMM_WORLD, fpath, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
     MPI_File_read_at_all(fh, mpi_rank * arraylen * sizeof(long long), array, arraylen, MPI_LONG_LONG_INT,
@@ -184,6 +190,8 @@ void load(char *fpath) {
  * Checks that the final array is actually sorted.
  */
 int check_sorted(void) {
+    const size_t arraylen = g_arraylen;
+    const int mpi_rank = g_mpi_rank;
     MPI_Request req[2];
     long long max_from_prev_rank;
     int sorted = 1, finalsorted = 1;
