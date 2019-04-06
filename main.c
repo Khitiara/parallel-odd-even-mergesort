@@ -106,15 +106,15 @@ int merge_lower(void) {
  * and stores the upper half into array.
  */
 int merge_upper(void) {
-    long long *dst = array;
-    long long *a = scratch;
-    long long *b = scratch + arraylen;
+    long long *dst = array + arraylen;
+    long long *a = scratch + arraylen;
+    long long *b = scratch + arraylen + arraylen;
     int i, order_changed = 0;
     for (i = 0; i < arraylen; ++i) {
-        if (*a >= *b) {
-            *dst++ = *a++;
+        if (a[-1] >= b[-1]) {
+            *--dst = *--a;
         } else {
-            *dst++ = *b++;
+            *--dst = *--b;
             order_changed = 1;
         }
     }
@@ -141,32 +141,32 @@ int merges(void) {
     memcpy(scratch, array, arraylen * sizeof(long long));
     if (0 == parity) {
         MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
-        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 1, MPI_COMM_WORLD, reqs + 1);
+        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
         MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
         changed |= merge_lower();
     } else {
         MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
-        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 1, MPI_COMM_WORLD, reqs + 1);
+        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
         MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
         changed |= merge_upper();
     }
 
     // Odd merge - first and last ranks do nothing
     if (0 != mpi_rank && mpi_size - 1 != mpi_rank) {
+        memcpy(scratch, array, arraylen * sizeof(long long));
         if (1 == parity) {
             MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
-            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 1, MPI_COMM_WORLD, reqs + 1);
+            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
             MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
             changed |= merge_lower();
         } else {
             MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
-            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 1, MPI_COMM_WORLD, reqs + 1);
+            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
             MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
             changed |= merge_upper();
         }
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Allreduce(&changed, &anychanges, 1, MPI_LONG_LONG_INT, MPI_LOR, MPI_COMM_WORLD);
+    MPI_Allreduce(&changed, &anychanges, 1, MPI_INT, MPI_LOR, MPI_COMM_WORLD);
     return anychanges;
 }
 
