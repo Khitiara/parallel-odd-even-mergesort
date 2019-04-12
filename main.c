@@ -144,6 +144,48 @@ int comp(const void *elem1, const void *elem2) {
     return 0;
 }
 
+int exchange_lower(const int mpi_rank, const size_t arraylen) {
+    int changed;
+    MPI_Request reqs[2];
+    MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
+    MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
+    MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    if (array[arraylen - 1] <= scratch[arraylen]) {
+        // if the max of this rank is less than or equal to the min of the other rank,
+        // the we are already sorted.
+        changed = 0;
+    } else if (array[0] >= scratch[arraylen + arraylen - 1]) {
+        // If the min of this rank is greater than or
+        // equal to the max of the other rank, then we must be swqpped
+        memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
+        changed = 1;
+    } else {
+        memcpy(scratch, array, arraylen * sizeof(long long));
+        changed = merge_lower();
+    }
+    return changed;
+}
+
+int exchange_upper(const int mpi_rank, const size_t arraylen) {
+    int changed;
+    MPI_Request reqs[2];
+    MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
+    MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
+    MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    if (array[arraylen - 1] <= scratch[arraylen]) {
+        // we must swap
+        memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
+        changed = 1;
+    } else if (array[0] >= scratch[arraylen + arraylen - 1]) {
+        //do nothing
+        changed = 0;
+    } else {
+        memcpy(scratch, array, arraylen * sizeof(long long));
+        changed = merge_upper();
+    }
+    return changed;
+}
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "hicpp-signed-bitwise"
 
@@ -151,80 +193,20 @@ int merges(void) {
     const size_t arraylen = g_arraylen;
     const int mpi_rank = g_mpi_rank;
     int parity = mpi_rank % 2, changed = 0, anychanges;
-    MPI_Request reqs[2];
 
     // Even merge
     if (0 == parity) {
-        MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
-        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
-        MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
-        if (array[arraylen - 1] <= scratch[arraylen]) {
-            // if the max of this rank is less than or equal to the min of the other rank,
-            // the we are already sorted.
-            ;
-        } else if (array[0] >= scratch[arraylen + arraylen - 1]) {
-            // If the min of this rank is greater than or
-            // equal to the max of the other rank, then we must be swqpped
-            memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
-            changed = 1;
-        } else {
-            memcpy(scratch, array, arraylen * sizeof(long long));
-            changed |= merge_lower();
-        }
+        changed |= exchange_lower(mpi_rank, arraylen);
     } else {
-        MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
-        MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
-        MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
-        if (array[arraylen - 1] <= scratch[arraylen]) {
-            // we must swap
-            memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
-            changed = 1;
-        } else if (array[0] >= scratch[arraylen + arraylen - 1]) {
-            //do nothing
-            ;
-        } else {
-            memcpy(scratch, array, arraylen * sizeof(long long));
-            changed |= merge_upper();
-        }
+        changed |= exchange_upper(mpi_rank, arraylen);
     }
 
     // Odd merge - first and last ranks do nothing
     if (0 != mpi_rank && mpi_size - 1 != mpi_rank) {
-        // memcpy(scratch, array, arraylen * sizeof(long long));
         if (1 == parity) {
-            MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
-            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
-            MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
-            // changed |= merge_lower();
-            if (array[arraylen - 1] <= scratch[arraylen]) {
-                // if the max of this rank is less than or equal to the min of the other rank,
-                // the we are already sorted.
-                ;
-            } else if (array[0] >= scratch[arraylen + arraylen - 1]) {
-                // If the min of this rank is greater than or
-                // equal to the max of the other rank, then we must be swqpped
-                memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
-                changed = 1;
-            } else {
-                memcpy(scratch, array, arraylen * sizeof(long long));
-                changed |= merge_lower();
-            }
+            changed |= exchange_lower(mpi_rank, arraylen);
         } else {
-            MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
-            MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
-            MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
-            // changed |= merge_upper();
-            if (array[arraylen - 1] <= scratch[arraylen]) {
-                // we must swap
-                memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
-                changed = 1;
-            } else if (array[0] >= scratch[arraylen + arraylen - 1]) {
-                //do nothing
-                ;
-            } else {
-                memcpy(scratch, array, arraylen * sizeof(long long));
-                changed |= merge_upper();
-            }
+            changed |= exchange_upper(mpi_rank, arraylen);
         }
     }
     MPI_Allreduce(&changed, &anychanges, 1, MPI_INT, MPI_LOR, MPI_COMM_WORLD);
