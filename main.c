@@ -150,6 +150,7 @@ int exchange_lower(const int mpi_rank, const size_t arraylen) {
     MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
     MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
     MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    #if USE_OPTIMIZED_MERGE
     if (array[arraylen - 1] <= scratch[arraylen]) {
         // if the max of this rank is less than or equal to the min of the other rank,
         // the we are already sorted.
@@ -163,6 +164,10 @@ int exchange_lower(const int mpi_rank, const size_t arraylen) {
         memcpy(scratch, array, arraylen * sizeof(long long));
         changed = merge_lower();
     }
+    #else
+    memcpy(scratch, array, arraylen * sizeof(long long));
+    changed = merge_lower();
+    #endif
     return changed;
 }
 
@@ -172,6 +177,7 @@ int exchange_upper(const int mpi_rank, const size_t arraylen) {
     MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
     MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
     MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    #if USE_OPTIMIZED_MERGE
     if (array[arraylen - 1] <= scratch[arraylen]) {
         // we must swap
         memcpy(array, scratch + arraylen, arraylen * sizeof(long long));
@@ -183,6 +189,10 @@ int exchange_upper(const int mpi_rank, const size_t arraylen) {
         memcpy(scratch, array, arraylen * sizeof(long long));
         changed = merge_upper();
     }
+    #else
+    memcpy(scratch, array, arraylen * sizeof(long long));
+    changed = merge_upper();
+    #endif
     return changed;
 }
 
