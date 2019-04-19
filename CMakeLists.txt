@@ -19,6 +19,3 @@ add_executable(sort-optmerge main.c)
 
 target_compile_definitions(sort-default PRIVATE USE_OPTIMIZED_MERGE=0)
 target_compile_definitions(sort-optmerge PRIVATE USE_OPTIMIZED_MERGE=1)
-
-target_compile_options(sort-default PRIVATE ${OPTIMIZATION_FLAG})
-target_compile_options(sort-optmerge PRIVATE ${OPTIMIZATION_FLAG})
