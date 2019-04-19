@@ -26,7 +26,7 @@ void load(char *fpath);
 int main(int argc, char **argv) {
     unsigned long long start_cycles = 0;
     unsigned long long end_cycles = 0;
-    double time;
+    double total_time, serial_time;
     int iterations = 0;
     int actually_sorted;
     MPI_Init(&argc, &argv);
@@ -49,35 +49,40 @@ int main(int argc, char **argv) {
     load(argv[1]);
     MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
-    time = (end_cycles - start_cycles) / g_processor_frequency;
+    serial_time = (end_cycles - start_cycles) / g_processor_frequency;
     if (g_mpi_rank == 0) {
-        printf("Loaded input data in %lf seconds.\n", time);
+        printf("Loaded input data in %lf seconds.\n", serial_time);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
     start_cycles = GetTimeBase();
     qsort(array, arraylen, sizeof(long long), comp);
+    MPI_Barrier(MPI_COMM_WORLD);
+    end_cycles = GetTimeBase();
+    serial_time = (end_cycles - start_cycles) / g_processor_frequency;
     while(merges()) {
         ++iterations;
     }
     ++iterations; // Last iteration
     MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
-    time = (end_cycles - start_cycles) / g_processor_frequency;
+    total_time = (end_cycles - start_cycles) / g_processor_frequency;
     if (g_mpi_rank == 0) {
         printf("Computation statistics:\n"
-               "        Rank Count: %d\n"
-               "    Total Elements: %lu\n"
-               "     Elements/Rank: %lu\n"
-               "        Iterations: %d\n"
-               "      Run time (s): %lf\n"
-               "Time/Iteration (s): %lf\n",
+               "            Rank Count: %d\n"
+               "        Total Elements: %lu\n"
+               "         Elements/Rank: %lu\n"
+               "            Iterations: %d\n"
+               "   Serial Run Time (s): %lf\n"
+               "    Merge Run time (s): %lf\n"
+               "    Time/Iteration (s): %lf\n",
             mpi_size,
             DATA_LENGTH,
             arraylen,
             iterations,
-            time,
-            time / iterations);
+            serial_time,
+            total_time - serial_time,
+            (total_time - serial_time) / iterations);
     }
 
     actually_sorted = check_sorted();
