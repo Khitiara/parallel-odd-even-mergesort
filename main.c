@@ -26,7 +26,7 @@ void load(char *fpath);
 int main(int argc, char **argv) {
     unsigned long long start_cycles = 0;
     unsigned long long end_cycles = 0;
-    double total_time, serial_time;
+    double merge_time, serial_time;
     int iterations = 0;
     int actually_sorted;
     MPI_Init(&argc, &argv);
@@ -60,13 +60,18 @@ int main(int argc, char **argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
     serial_time = (end_cycles - start_cycles) / g_processor_frequency;
+    if(g_mpi_rank == 0) {
+        puts("Serial sort complete");
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    start_cycles = GetTimeBase();
     while(merges()) {
         ++iterations;
     }
     ++iterations; // Last iteration
     MPI_Barrier(MPI_COMM_WORLD);
     end_cycles = GetTimeBase();
-    total_time = (end_cycles - start_cycles) / g_processor_frequency;
+    merge_time = (end_cycles - start_cycles) / g_processor_frequency;
     if (g_mpi_rank == 0) {
         printf("Computation statistics:\n"
                "            Rank Count: %d\n"
@@ -81,8 +86,8 @@ int main(int argc, char **argv) {
             arraylen,
             iterations,
             serial_time,
-            total_time - serial_time,
-            (total_time - serial_time) / iterations);
+            merge_time,
+            merge_time / iterations);
     }
 
     actually_sorted = check_sorted();
