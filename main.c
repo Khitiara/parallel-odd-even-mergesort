@@ -105,6 +105,19 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+#ifndef NDEBUG
+void ensure_local_sorted(void) {
+    const size_t arraylen = g_arraylen;
+    size_t i;
+    for (i = 1; i < arraylen; ++i) {
+        if (array[i] < array[i - 1]) {
+            printf("Rank %d not sorted\n", g_mpi_rank);
+            break;
+        }
+    }
+}
+#endif
+
 /**
  * Merges two arrays stored in the lower and upper halves of scratch
  * and stores the lower half into array.
@@ -124,6 +137,9 @@ int merge_lower(void) {
             order_changed = 1;
         }
     }
+    #ifndef NDEBUG
+    ensure_local_sorted();
+    #endif
     return order_changed;
 }
 
@@ -146,6 +162,9 @@ int merge_upper(void) {
             order_changed = 1;
         }
     }
+    #ifndef NDEBUG
+    ensure_local_sorted();
+    #endif
     return order_changed;
 }
 
@@ -227,7 +246,7 @@ int merges(void) {
 
     // Odd merge - first and last ranks do nothing
     if (0 != mpi_rank && mpi_size - 1 != mpi_rank) {
-        if (1 == parity) {
+        if (0 != parity) {
             changed |= exchange_lower(mpi_rank, arraylen);
         } else {
             changed |= exchange_upper(mpi_rank, arraylen);
