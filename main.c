@@ -5,6 +5,8 @@
 #include <string.h>
 
 #define DATA_LENGTH (1ul << 27u)
+#define UP_TAG 0
+#define DOWN_TAG 1
 
 size_t g_arraylen;
 long long *array;    // length arraylen
@@ -112,7 +114,8 @@ int merge_lower(void) {
     long long *restrict dst = array;
     const long long *a = scratch;
     const long long *b = scratch + arraylen;
-    int i, order_changed = 0;
+    size_t i;
+    int order_changed = 0;
     for (i = 0; i < arraylen; ++i) {
         if (*a < *b) {
             *dst++ = *a++;
@@ -133,7 +136,8 @@ int merge_upper(void) {
     long long *restrict dst = array + arraylen;
     const long long *a = scratch + arraylen;
     const long long *b = scratch + arraylen + arraylen;
-    int i, order_changed = 0;
+    size_t i;
+    int order_changed = 0;
     for (i = 0; i < arraylen; ++i) {
         if (a[-1] >= b[-1]) {
             *--dst = *--a;
@@ -157,8 +161,8 @@ int comp(const void *elem1, const void *elem2) {
 int exchange_lower(const int mpi_rank, const size_t arraylen) {
     int changed;
     MPI_Request reqs[2];
-    MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs);
-    MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, 0, MPI_COMM_WORLD, reqs + 1);
+    MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, DOWN_TAG, MPI_COMM_WORLD, reqs + 1);
+    MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank + 1, UP_TAG, MPI_COMM_WORLD, reqs);
     MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
     #if USE_OPTIMIZED_MERGE
     if (array[arraylen - 1] <= scratch[arraylen]) {
@@ -184,8 +188,8 @@ int exchange_lower(const int mpi_rank, const size_t arraylen) {
 int exchange_upper(const int mpi_rank, const size_t arraylen) {
     int changed;
     MPI_Request reqs[2];
-    MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs);
-    MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, 0, MPI_COMM_WORLD, reqs + 1);
+    MPI_Irecv(scratch + arraylen, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, UP_TAG, MPI_COMM_WORLD, reqs + 1);
+    MPI_Isend(array, arraylen, MPI_LONG_LONG_INT, mpi_rank - 1, DOWN_TAG, MPI_COMM_WORLD, reqs);
     MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
     #if USE_OPTIMIZED_MERGE
     if (array[arraylen - 1] <= scratch[arraylen]) {
